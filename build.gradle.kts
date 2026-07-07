@@ -85,5 +85,9 @@ tasks.jar {
         include("mod.hjson")
     }
 
+    from("assets/"){
+        include("**")
+    }
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

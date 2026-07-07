@@ -1,6 +1,8 @@
 package kuko.net
 
+import arc.Core
 import arc.util.Log
+import kuko.CVars
 import kuko.CVars.rand
 import java.io.Closeable
 import java.net.InetSocketAddress
@@ -32,6 +34,11 @@ object ProxyListener {
      * Стартует новую прокси-сессию до destIp:destPort.
      * Возвращает локальный порт, на который должен подключиться клиент игры
      * (localhost:port).
+     *
+     * Если подключение к прокси не удалось (proxy == null или ошибка в
+     * proxy.block()), слушатели просто не запускаются, но порт всё равно
+     * возвращается как ни в чём не бывало — "тупая" заглушка без реальной
+     * пересылки трафика.
      */
     @Synchronized
     fun listen(destIp: String, destPort: Int): Int {
@@ -75,13 +82,19 @@ object ProxyListener {
 
         sessions[listenPort] = session
 
-        try {
+        val started = try {
             session.start()
         } catch (e: Exception) {
-            Log.err("[proxy] failed to start session on $listenPort", e)
-            sessions.remove(listenPort)
-            session.close()
-            throw e
+            // сюда попадаем только при совсем неожиданных ошибках - сама
+            // ошибка подключения к прокси уже перехвачена внутри start().
+            // Порт всё равно "тупо" отдаём клиенту - слушателей просто не
+            // будет, сокеты останутся висеть открытыми.
+            Log.err("[proxy] unexpected error starting session on $listenPort, leaving port hanging", e)
+            false
+        }
+
+        if (!started) {
+            Log.warn("[proxy:$listenPort] no listeners running (proxy unavailable), port is a dummy stub")
         }
 
         Log.info("[proxy] listening on $listenPort -> $destIp:$destPort")
@@ -133,7 +146,12 @@ private class ProxySession(
     private val onClosed: () -> Unit
 ) : Closeable {
 
-    private val proxy = SocksProxy("localhost", 1080, destIp, destPort, 4)
+    private val proxy = runCatching {
+        SocksProxy(Core.settings.getString("proxyip"), CVars.proxyPort, destIp, destPort, CVars.socksVersion)
+    }.onFailure {
+        Log.err("Failed to connect to proxy!")
+    }.getOrNull()
+
     private val alive = AtomicBoolean(true)
 
     // getUdp() кэшируем вручную (не lateinit/lazy, т.к. может вернуть null,
@@ -145,7 +163,7 @@ private class ProxySession(
         proxyUdp?.let { return it }
         synchronized(this) {
             proxyUdp?.let { return it }
-            val created = requireNotNull(proxy.getUdp()) { "proxy.getUdp() returned null" }
+            val created = requireNotNull(proxy?.getUdp()) { "proxy.getUdp() returned null" }
             proxyUdp = created
             return created
         }
@@ -157,11 +175,29 @@ private class ProxySession(
     @Volatile
     private var clientUdpAddr: SocketAddress? = null
 
-    fun start() {
-        proxy.block()
+    /**
+     * Возвращает true, если слушатели реально запустились (и трафик будет
+     * пересылаться), false — если проверка/подключение к прокси не удались
+     * и порт остаётся "тупой" заглушкой без запущенных циклов.
+     */
+    fun start(): Boolean {
+        if (proxy == null) {
+            Log.err("[proxy:$listenPort] proxy unavailable, leaving port hanging")
+            return false
+        }
+
+        try {
+            proxy.block()
+        } catch (e: Exception) {
+            Log.err("[proxy:$listenPort] proxy connect failed, leaving port hanging", e)
+            return false
+        }
+
         executor.execute(::acceptLoop)
         executor.execute(::udpClientToProxyLoop)
         executor.execute(::udpProxyToClientLoop)
+
+        return true
     }
 
     private fun acceptLoop() {
@@ -183,6 +219,7 @@ private class ProxySession(
     }
 
     private fun handleTcp(client: SocketChannel) {
+        proxy ?: return
         val target: SocketChannel = try {
             requireNotNull(proxy.getTcp()) { "proxy.getTcp() returned null" }
         } catch (e: Exception) {
@@ -299,9 +336,11 @@ private class ProxySession(
         // proxyUdp мог не успеть инициализироваться, если UDP-пакетов не было
         proxyUdp?.let { runCatching { it.close() } }
 
-        try {
-            proxy.close()
-        } catch (_: Exception) {
+        proxy?.let {
+            try {
+                it.close()
+            } catch (_: Exception) {
+            }
         }
 
         onClosed()
