@@ -1,20 +1,22 @@
 #the mod name as displayed in-game
-displayName: "Kotlin Mod Template"
+displayName: "Proxy Mod"
 
 #the internal name of your mod
-name: "example-kotlin-mod"
+name: "md-proxy"
 
 #your name
-author: "You"
+author: "kuko"
 
 #the fully qualified main class of the mod
-main: "example.ExampleKotlinMod"
+main: "kuko.ProxyMod"
 
 #the mod description as seen in the mod dialog
-description: "A Mindustry Kotlin mod template."
+description: "idk."
 
 #the mod version
 version: 1.0
 
 #the minimum game build required to run this mod
-minGameVersion: 146
+minGameVersion: 154
+
+hidden: true
