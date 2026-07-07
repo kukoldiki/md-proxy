@@ -1,5 +1,6 @@
 package kuko.ui
 
+import arc.Core
 import arc.scene.ui.Dialog
 import arc.util.Reflect
 import arc.util.Time
@@ -9,6 +10,10 @@ import mindustry.ui.dialogs.JoinDialog
 
 class JoinDialogPatched : JoinDialog() {
     override fun connect(ip: String, port: Int) {
+        if(!Core.settings.getBool("useproxy")) {
+            super.connect(ip, port)
+            return
+        }
         if (Vars.player.name.trim { it <= ' ' }.isEmpty()) {
             Vars.ui.showInfo("@noname")
             return

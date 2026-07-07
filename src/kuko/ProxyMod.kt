@@ -24,6 +24,7 @@ class ProxyMod : Mod() {
             CVars.proxyPort = Core.settings.getString("proxyport").toInt()
 
             Vars.ui.settings.addCategory("proxy") { b ->
+                b.checkPref("useproxy", false)
                 b.textPref("proxyip", "localhost")
                 b.textPref("proxyport", "1080") {
                     val port = it.toIntOrNull()
