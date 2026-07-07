@@ -20,8 +20,8 @@ class ProxyMod : Mod() {
             JsonIO.json.copyFields(old, Vars.ui.join)
             Log.info("JoinDialog Successfuly patched!!!")
 
-            CVars.socksVersion = Core.settings.getInt("socksversion")
-            CVars.proxyPort = Core.settings.getString("proxyport").toInt()
+            CVars.socksVersion = Core.settings.getInt("socksversion", 5)
+            CVars.proxyPort = Core.settings.getString("proxyport", "1080").toIntOrNull() ?: 1080
 
             Vars.ui.settings.addCategory("proxy") { b ->
                 b.checkPref("useproxy", false)
