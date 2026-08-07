@@ -14,7 +14,9 @@ import mindustry.ui.dialogs.BaseDialog
 
 class ProxyMod : Mod() {
     init {
+        Log.info("ProxyMod constructor called!")
         Events.on(EventType.ClientLoadEvent::class.java) { _ ->
+            Log.info("ProxyMod loading...")
             val old = Vars.ui.join
             Vars.ui.join = JoinDialogPatched()
             JsonIO.json.copyFields(old, Vars.ui.join)
