@@ -6,13 +6,14 @@ import arc.scene.ui.Dialog
 import arc.util.Reflect
 import arc.util.Time
 import arc.util.serialization.Base64Coder
+import kuko.isLocal
 import kuko.net.ProxyListener
 import mindustry.Vars
 import mindustry.ui.dialogs.JoinDialog
 
 class JoinDialogPatched : JoinDialog() {
     override fun connect(ip: String, port: Int) {
-        if(!Core.settings.getBool("useproxy")) {
+        if(!Core.settings.getBool("useproxy") || isLocal(ip)) {
             super.connect(ip, port)
             return
         }
