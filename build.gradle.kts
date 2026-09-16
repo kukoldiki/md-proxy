@@ -91,3 +91,65 @@ tasks.jar {
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+val sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+
+// dexes and desugars the desktop jar (including the bundled Kotlin stdlib) into an
+// Android-compatible jar, using d8 from the Android SDK build-tools.
+val jarAndroid = tasks.register("jarAndroid") {
+    dependsOn(tasks.jar)
+
+    doLast {
+        if (sdkRoot == null || !file(sdkRoot).exists()) {
+            throw GradleException("No valid Android SDK found. Ensure that ANDROID_HOME (or ANDROID_SDK_ROOT) is set to your Android SDK directory.")
+        }
+
+        val platformRoot = file("$sdkRoot/platforms").listFiles()
+            ?.sortedDescending()
+            ?.find { file(it).resolve("android.jar").exists() }
+            ?: throw GradleException("No android.jar found. Ensure that you have an Android platform installed.")
+
+        val buildToolsDir = file("$sdkRoot/build-tools").listFiles()
+            ?.filter { it.name.matches(Regex("""\d+\.\d+\.\d+""")) }
+            ?.maxByOrNull { it.name.split(".")[0].toInt() }
+            ?: throw GradleException("No Android build-tools found. Install a build-tools version via the Android SDK manager.")
+
+        val d8 = file(buildToolsDir).resolve(if (isWindows) "d8.bat" else "d8")
+        if (!d8.exists()) throw GradleException("d8 not found at $d8")
+
+        val classpath = (configurations.compileClasspath.get().files + configurations.runtimeClasspath.get().files + file(platformRoot).resolve("android.jar"))
+            .flatMap { listOf("--classpath", it.path) }
+
+        val desktopJar = file("${layout.buildDirectory.get()}/libs/${project.name}Desktop.jar")
+        val outputJar = file("${layout.buildDirectory.get()}/libs/${project.name}Android.jar")
+
+        val command = listOf(d8.path) + classpath + listOf("--min-api", "21", "--output", outputJar.path, desktopJar.path)
+        val process = ProcessBuilder(command)
+            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+        if (process.waitFor() != 0) throw GradleException("d8 failed to dex $desktopJar")
+    }
+}
+
+// packages the desktop and Android (dexed) classes into a single jar that works on both platforms.
+tasks.register<Jar>("deploy") {
+    dependsOn(tasks.jar)
+    dependsOn(jarAndroid)
+
+    archiveFileName.set("${project.name}.jar")
+
+    from({
+        listOf(
+            zipTree("${layout.buildDirectory.get()}/libs/${project.name}Desktop.jar"),
+            zipTree("${layout.buildDirectory.get()}/libs/${project.name}Android.jar")
+        )
+    })
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    doLast {
+        delete("${layout.buildDirectory.get()}/libs/${project.name}Android.jar")
+    }
+}

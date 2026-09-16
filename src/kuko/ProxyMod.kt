@@ -44,26 +44,8 @@ class ProxyMod : Mod() {
                     }
                     CVars.proxyPort = port
                 }
-                /*b.textPref("socksversion", "5") {
-                    val version = it.toIntOrNull()
-
-                    if (version == null || version !in listOf(4, 5)) {
-                        val dialog = BaseDialog("invalidversion")
-                        dialog.cont.add(bundle.get("error.invalidversion")).row()
-                        dialog.closeOnBack()
-                        dialog.cont.button("@close") {
-                            dialog.hide()
-                        }
-                        dialog.show()
-                        Core.settings.put("socksversion", "5")
-                        CVars.socksVersion = 5
-                        return@textPref
-                    }
-
-                    CVars.socksVersion = version
-                }*/
                 b.sliderPref("socksversion", 5, 4, 5, 1) { ver ->
-                    CVars.socksVersion = ver
+                    socksVersion = ver
                     return@sliderPref bundle.format("slider.version", ver)
                 }
             }

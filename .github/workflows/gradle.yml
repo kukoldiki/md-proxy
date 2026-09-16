@@ -8,16 +8,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up PATH
-      run: |
-        echo "${ANDROID_HOME}/build-tools/34.0.0" >> $GITHUB_PATH
-    - name: Set up JDK 17
+    - name: Set up JDK 25
       uses: actions/setup-java@v4
       with:
         java-version: 25
         distribution: 'temurin'
-    - name: Build mod jar
-      run: ./gradlew jar
+    - name: Build mod jar (desktop + android)
+      run: ./gradlew deploy
     - name: Upload built jar file
       uses: actions/upload-artifact@v7
       with:

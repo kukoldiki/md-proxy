@@ -26,12 +26,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build jar
-        run: ./gradlew jar
+        run: ./gradlew deploy
 
       - name: Find jar
         id: jar
         run: |
-          FILE=$(ls build/libs/*.jar | head -n 1)
+          FILE=$(ls build/libs/${{ github.event.repository.name }}.jar)
           echo "file=$FILE" >> $GITHUB_OUTPUT
 
       - name: Upload release asset
